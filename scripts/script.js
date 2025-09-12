@@ -6,9 +6,14 @@ document.addEventListener("DOMContentLoaded", function () {
       .then(data => {
         container.innerHTML = data;
 
+        const links = container.querySelectorAll("a");
+        // Set aria-current="page" for the first link initially
+        if (links.length > 0) {
+          links[0].setAttribute("aria-current", "page");
+        }
+
         const currentPath = window.location.pathname.split("/").pop().replace(".html", "");
 
-        const links = container.querySelectorAll("a");
         links.forEach(link => {
           const href = link.getAttribute("href").replace("/", "").replace(".html", "");
           if (href === currentPath) {
