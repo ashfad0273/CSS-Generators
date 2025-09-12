@@ -132,7 +132,7 @@
                 colorsContainer.innerHTML += `
                     <div class="flex items-center gap-2 bg-gray-700 p-2 rounded">
                         <input type="color" id="${colorId}" value="${stop.color}" class="w-10 h-10 p-0 border-0 bg-transparent" />
-                        <input type="range" min="0" max="100" value="${stop.percent}" id="${percentId}" class="slider w-24" draggable="true" />
+                        <input type="range" min="0" max="100" value="${stop.percent}" id="${percentId}" class="slider w-24" />
                         <input type="number" min="0" max="100" value="${stop.percent}" class="w-16 p-1 rounded bg-gray-800 text-white border border-gray-600 text-xs percentNum" id="num${idx}" />
                         <span class="text-xs ml-1">%</span>
                         ${removeBtn}
@@ -151,26 +151,6 @@
                 });
                 document.getElementById(`num${idx}`).addEventListener('input', (e) => {
                     handleSliderChange(idx, parseInt(e.target.value));
-                });
-
-                // Make slider draggable for reordering stops
-                const slider = document.getElementById(`percent${idx}`);
-                slider.addEventListener('dragstart', (e) => {
-                    e.dataTransfer.setData('colorIdx', idx);
-                });
-                slider.addEventListener('dragover', (e) => {
-                    e.preventDefault();
-                });
-                slider.addEventListener('drop', (e) => {
-                    e.preventDefault();
-                    const fromIdx = parseInt(e.dataTransfer.getData('colorIdx'));
-                    if (fromIdx !== idx) {
-                        const moved = colors.splice(fromIdx, 1)[0];
-                        colors.splice(idx, 0, moved);
-                        normalizePercents();
-                        renderColors();
-                        updatePreviewAndOutput();
-                    }
                 });
             });
 
