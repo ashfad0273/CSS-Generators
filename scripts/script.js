@@ -6,20 +6,16 @@ document.addEventListener("DOMContentLoaded", function () {
       .then(data => {
         container.innerHTML = data;
 
-        // Detect current page from URL
         const currentPath = window.location.pathname.split("/").pop().replace(".html", "");
 
-        // Highlight matching sidebar link
         const links = container.querySelectorAll("a");
         links.forEach(link => {
           const href = link.getAttribute("href").replace("/", "").replace(".html", "");
           if (href === currentPath) {
-            link.classList.add("text-white", "border-blue-500");
-            link.classList.remove("text-gray-400");
+            link.className = "flex items-center px-6 py-3 rounded-lg mx-2 my-1 bg-gray-700 border-l-4 border-blue-500 font-semibold transition-colors hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 text-white";
             link.setAttribute("aria-current", "page");
           } else {
-            link.classList.remove("text-white", "border-blue-500");
-            link.classList.add("text-gray-400");
+            link.className = "flex items-center px-6 py-3 rounded-lg mx-2 my-1 bg-gray-800 border-l-4 border-transparent font-semibold transition-colors hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-400";
             link.removeAttribute("aria-current");
           }
         });
