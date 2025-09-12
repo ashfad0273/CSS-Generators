@@ -6,13 +6,15 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         .modal-bg { background: rgba(17, 24, 39, 0.85); }
+        .slider::-webkit-slider-thumb { background: #10b981; }
+        .slider { cursor: grab; }
+        .slider:active { cursor: grabbing; }
+        .rotation-slider::-webkit-slider-thumb { background: #3b82f6; }
+        .rotation-slider { cursor: grab; }
+        .rotation-slider:active { cursor: grabbing; }
     </style>
 </head>
 <body class="bg-gray-900 text-white min-h-screen flex items-center justify-center p-6">
-    
-    <div id="sidebar-container"></div>
-
-   
     <main class="w-full max-w-2xl bg-gray-800 p-6 rounded-lg shadow-lg">
         <h1 class="text-2xl font-bold mb-4 text-center">CSS Gradient Generator</h1>
 
@@ -22,35 +24,27 @@
                 <select id="type" class="w-full p-2 rounded bg-gray-700 text-white border border-gray-600">
                     <option value="linear" selected>Linear</option>
                     <option value="radial">Radial</option>
+                    <option value="conic">Conic</option>
                 </select>
             </div>
-
             <div class="md:col-span-2">
                 <label class="block text-sm mb-1">Direction (deg or keyword)</label>
                 <input id="direction" class="w-full p-2 rounded bg-gray-700 text-white border border-gray-600"
-                             placeholder="e.g. 90deg or to right" value="90deg" />
+                        placeholder="e.g. 90deg or to right" value="90deg" />
+                <div id="rotationSliderBox" class="mt-2 flex items-center gap-2">
+                    <label for="rotationSlider" class="text-xs text-gray-400">Rotation:</label>
+                    <input type="range" min="0" max="360" value="90" id="rotationSlider" class="rotation-slider w-40" />
+                    <input type="number" min="0" max="360" value="90" id="rotationNum" class="w-16 p-1 rounded bg-gray-800 text-white border border-gray-600 text-xs" />
+                    <span class="text-xs ml-1">deg</span>
+                </div>
             </div>
         </div>
 
-        <div class="mb-2 font-semibold text-sm">Color Stops (min 2)</div>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
-            <div>
-                <input type="color" id="color1" class="w-full h-10 p-0 border-0 bg-transparent" value="#ff0000" />
-                <input id="pos1" class="w-full mt-1 p-2 rounded bg-gray-700 text-white border border-gray-600 text-sm" placeholder="0%" value="0%" />
-            </div>
-            <div>
-                <input type="color" id="color2" class="w-full h-10 p-0 border-0 bg-transparent" value="#0000ff" />
-                <input id="pos2" class="w-full mt-1 p-2 rounded bg-gray-700 text-white border border-gray-600 text-sm" placeholder="100%" value="100%" />
-            </div>
-            <div>
-                <input type="color" id="color3" class="w-full h-10 p-0 border-0 bg-transparent" value="#00ff00" />
-                <input id="pos3" class="w-full mt-1 p-2 rounded bg-gray-700 text-white border border-gray-600 text-sm" placeholder="optional" value="" />
-            </div>
-            <div>
-                <input type="color" id="color4" class="w-full h-10 p-0 border-0 bg-transparent" value="#ffffff" />
-                <input id="pos4" class="w-full mt-1 p-2 rounded bg-gray-700 text-white border border-gray-600 text-sm" placeholder="optional" value="" />
-            </div>
+        <div class="mb-2 font-semibold text-sm flex items-center justify-between">
+            <span>Color Stops (min 2)</span>
+            <button id="addColorBtn" class="px-2 py-1 text-xs bg-blue-600 rounded hover:bg-blue-500">+ Add Color</button>
         </div>
+        <div id="colorsContainer" class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-4"></div>
 
         <div class="flex gap-2 items-center">
             <button id="generateBtn" class="px-4 py-2 bg-green-600 rounded hover:bg-green-500">Generate</button>
@@ -67,38 +61,177 @@
     </main>
 
     <script>
-        // Elements
+        // Gradient types
         const typeEl = document.getElementById('type');
         const dirEl = document.getElementById('direction');
-        const colorEls = [1,2,3,4].map(n => document.getElementById('color'+n));
-        const posEls = [1,2,3,4].map(n => document.getElementById('pos'+n));
         const outputBox = document.getElementById('outputBox');
         const preview = document.getElementById('preview');
         const generateBtn = document.getElementById('generateBtn');
         const copyBtn = document.getElementById('copyBtn');
         const status = document.getElementById('status');
+        const colorsContainer = document.getElementById('colorsContainer');
+        const addColorBtn = document.getElementById('addColorBtn');
+        const rotationSlider = document.getElementById('rotationSlider');
+        const rotationNum = document.getElementById('rotationNum');
+        const rotationSliderBox = document.getElementById('rotationSliderBox');
 
-        function buildStops() {
-            const stops = [];
-            for (let i=0;i<4;i++){
-                const color = colorEls[i].value;
-                const pos = (posEls[i].value || "").trim();
-                // Only include if a color input is present (color inputs always have value)
-                // But consider omitting stops with empty color? color inputs always produce hex.
-                if (color) {
-                    stops.push(pos ? `${color} ${pos}` : color);
-                }
+        // Initial colors data
+        let colors = [
+            { color: "#ff0000", percent: 0 },
+            { color: "#0000ff", percent: 100 }
+        ];
+
+        // Show/hide rotation slider based on gradient type
+        function updateRotationSliderVisibility() {
+            if (typeEl.value === 'linear' || typeEl.value === 'conic') {
+                rotationSliderBox.style.display = '';
+            } else {
+                rotationSliderBox.style.display = 'none';
             }
-            return stops;
         }
 
+        // Sync direction input and rotation slider
+        function syncDirectionWithSlider() {
+            let val = dirEl.value.trim();
+            if (/^\d+deg$/.test(val)) {
+                let deg = parseInt(val);
+                rotationSlider.value = deg;
+                rotationNum.value = deg;
+            }
+        }
+        function syncSliderWithDirection() {
+            let deg = parseInt(rotationSlider.value);
+            dirEl.value = deg + 'deg';
+            rotationNum.value = deg;
+            updatePreviewAndOutput();
+        }
+        function syncNumWithDirection() {
+            let deg = parseInt(rotationNum.value);
+            if (isNaN(deg)) deg = 0;
+            deg = Math.max(0, Math.min(360, deg));
+            rotationSlider.value = deg;
+            dirEl.value = deg + 'deg';
+            updatePreviewAndOutput();
+        }
+
+        // Render color stops UI
+        function renderColors() {
+            colorsContainer.innerHTML = "";
+            colors.forEach((stop, idx) => {
+                const colorId = `color${idx}`;
+                const percentId = `percent${idx}`;
+                const removeBtn = colors.length > 2
+                    ? `<button class="ml-2 px-2 py-1 text-xs bg-red-600 rounded hover:bg-red-500 removeBtn" data-idx="${idx}">✕</button>`
+                    : "";
+
+                colorsContainer.innerHTML += `
+                    <div class="flex items-center gap-2 bg-gray-700 p-2 rounded">
+                        <input type="color" id="${colorId}" value="${stop.color}" class="w-10 h-10 p-0 border-0 bg-transparent" />
+                        <input type="range" min="0" max="100" value="${stop.percent}" id="${percentId}" class="slider w-24" draggable="true" />
+                        <input type="number" min="0" max="100" value="${stop.percent}" class="w-16 p-1 rounded bg-gray-800 text-white border border-gray-600 text-xs percentNum" id="num${idx}" />
+                        <span class="text-xs ml-1">%</span>
+                        ${removeBtn}
+                    </div>
+                `;
+            });
+
+            // Wire color inputs
+            colors.forEach((_, idx) => {
+                document.getElementById(`color${idx}`).addEventListener('input', (e) => {
+                    colors[idx].color = e.target.value;
+                    updatePreviewAndOutput();
+                });
+                document.getElementById(`percent${idx}`).addEventListener('input', (e) => {
+                    handleSliderChange(idx, parseInt(e.target.value));
+                });
+                document.getElementById(`num${idx}`).addEventListener('input', (e) => {
+                    handleSliderChange(idx, parseInt(e.target.value));
+                });
+
+                // Make slider draggable for reordering stops
+                const slider = document.getElementById(`percent${idx}`);
+                slider.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.setData('colorIdx', idx);
+                });
+                slider.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                });
+                slider.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    const fromIdx = parseInt(e.dataTransfer.getData('colorIdx'));
+                    if (fromIdx !== idx) {
+                        const moved = colors.splice(fromIdx, 1)[0];
+                        colors.splice(idx, 0, moved);
+                        normalizePercents();
+                        renderColors();
+                        updatePreviewAndOutput();
+                    }
+                });
+            });
+
+            // Wire remove buttons
+            document.querySelectorAll('.removeBtn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const idx = parseInt(e.target.dataset.idx);
+                    colors.splice(idx, 1);
+                    normalizePercents();
+                    renderColors();
+                    updatePreviewAndOutput();
+                });
+            });
+        }
+
+        // Add new color
+        addColorBtn.addEventListener('click', () => {
+            colors.push({ color: "#ffffff", percent: 100 });
+            normalizePercents();
+            renderColors();
+            updatePreviewAndOutput();
+        });
+
+        // Normalize percentages so all sliders sum to 100
+        function normalizePercents() {
+            if (colors.length === 1) {
+                colors[0].percent = 100;
+                return;
+            }
+            colors.sort((a, b) => a.percent - b.percent);
+            colors[0].percent = 0;
+            colors[colors.length - 1].percent = 100;
+            if (colors.length > 2) {
+                const step = 100 / (colors.length - 1);
+                for (let i = 1; i < colors.length - 1; i++) {
+                    colors[i].percent = Math.round(i * step);
+                }
+            }
+        }
+
+        // Handle slider change and adjust others so sum = 100
+        function handleSliderChange(idx, newPercent) {
+            newPercent = Math.max(0, Math.min(100, newPercent));
+            colors[idx].percent = newPercent;
+            colors.sort((a, b) => a.percent - b.percent);
+            colors[0].percent = 0;
+            colors[colors.length - 1].percent = 100;
+            for (let i = 1; i < colors.length - 1; i++) {
+                const prev = colors[i - 1].percent;
+                const next = colors[i + 1].percent;
+                colors[i].percent = Math.max(prev + 1, Math.min(colors[i].percent, next - 1));
+            }
+            renderColors();
+            updatePreviewAndOutput();
+        }
+
+        // Build gradient string
         function buildGradientString() {
             const type = typeEl.value;
-            const direction = dirEl.value.trim() || '90deg';
-            const stops = buildStops();
+            let direction = dirEl.value.trim() || '90deg';
+            const stops = colors.map(stop => `${stop.color} ${stop.percent}%`);
             if (stops.length < 2) return '';
             if (type === 'radial') {
                 return `radial-gradient(${stops.join(', ')})`;
+            } else if (type === 'conic') {
+                return `conic-gradient(from ${direction}, ${stops.join(', ')})`;
             } else {
                 return `linear-gradient(${direction}, ${stops.join(', ')})`;
             }
@@ -117,11 +250,24 @@
         }
 
         // Wire inputs for live preview
-        [typeEl, dirEl, ...colorEls, ...posEls].forEach(el => {
+        [typeEl, dirEl].forEach(el => {
             el.addEventListener('input', () => {
                 updatePreviewAndOutput();
                 status.textContent = '';
             });
+        });
+
+        // Rotation slider events
+        rotationSlider.addEventListener('input', syncSliderWithDirection);
+        rotationNum.addEventListener('input', syncNumWithDirection);
+        dirEl.addEventListener('input', () => {
+            syncDirectionWithSlider();
+            updatePreviewAndOutput();
+        });
+
+        typeEl.addEventListener('input', () => {
+            updateRotationSliderVisibility();
+            updatePreviewAndOutput();
         });
 
         generateBtn.addEventListener('click', () => {
@@ -140,9 +286,11 @@
         });
 
         // Initialize
+        normalizePercents();
+        renderColors();
+        updateRotationSliderVisibility();
+        syncDirectionWithSlider();
         updatePreviewAndOutput();
     </script>
-<script src="script.js"></script>
-
 </body>
 </html>
