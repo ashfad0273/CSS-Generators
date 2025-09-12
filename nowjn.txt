@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>CSS Generator Modules</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      .modal-bg { background: rgba(17, 24, 39, 0.85); }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex">
+
+    <!-- Sidebar -->
+    <aside id="sidebar" class="fixed z-30 inset-y-0 left-0 w-64 bg-gray-800 border-r border-gray-700 flex flex-col transition-transform duration-200 transform md:translate-x-0 -translate-x-full md:relative md:flex md:w-64 md:translate-x-0">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-700">
+            <span class="text-xl font-bold">CSS Generators</span>
+            <button id="closeSidebar" class="md:hidden text-gray-400 hover:text-white focus:outline-none">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+        <nav class="flex-1 px-4 py-4 overflow-y-auto">
+            <ul class="space-y-2" id="sidebarLinks"></ul>
+        </nav>
+    </aside>
+
+    <!-- Sidebar Toggle Button (Mobile) -->
+    <button id="openSidebar" class="fixed z-40 top-4 left-4 md:hidden bg-gray-800 p-2 rounded text-gray-300 hover:text-white focus:outline-none">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+        </svg>
+    </button>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col items-center justify-center w-full min-h-screen md:ml-64 p-8 transition-all duration-200">
+        <div class="w-full max-w-xl bg-gray-800 p-6 rounded-lg shadow-lg">
+            <h1 class="text-2xl font-bold mb-4 text-center">CSS Generator Modules</h1>
+            <label class="block mb-2 text-sm font-medium md:hidden">Choose Generator</label>
+            <select id="generatorSelector" class="w-full mb-6 p-2 rounded bg-gray-700 text-white border border-gray-600 md:hidden"></select>
+            <div id="formArea"></div>
+        </div>
+    </main>
+
+    <!-- Modal for property selection (hidden by default) -->
+    <div id="propertyModal" class="fixed inset-0 z-50 flex items-center justify-center hidden">
+      <div class="modal-bg absolute inset-0"></div>
+      <div class="relative bg-gray-800 rounded-lg shadow-lg w-full max-w-md mx-4">
+        <div class="flex items-center justify-between px-4 py-3 border-b border-gray-700">
+          <span class="font-semibold text-lg">Add CSS Property</span>
+          <button id="closePropertyModal" class="text-gray-400 hover:text-white focus:outline-none">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+        <div class="p-4">
+          <input id="propertySearch" type="text" placeholder="Search property..." class="w-full mb-3 p-2 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none" />
+          <div id="propertyList" class="max-h-64 overflow-y-auto space-y-1"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+/**
+ * List of standard CSS properties for the property picker.
+ * (Shortened for brevity; you can expand this list as needed.)
+ */
+const CSS_PROPERTIES = [
+  "background", "background-color", "background-image", "background-size", "background-position",
+  "border", "border-radius", "border-color", "border-width", "border-style",
+  "box-shadow", "color", "display", "filter", "flex", "flex-direction", "font-size", "font-family",
+  "font-weight", "gap", "grid-template-columns", "grid-template-rows", "height", "justify-content",
+  "letter-spacing", "line-height", "margin", "margin-top", "margin-bottom", "margin-left", "margin-right",
+  "max-width", "min-width", "opacity", "outline", "overflow", "padding", "padding-top", "padding-bottom",
+  "padding-left", "padding-right", "perspective", "position", "right", "left", "top", "bottom",
+  "text-align", "text-decoration", "text-shadow", "transform", "transition", "transition-delay",
+  "transition-duration", "transition-property", "transition-timing-function", "vertical-align",
+  "visibility", "white-space", "width", "z-index"
+];
+
+/**
+ * Property input type mapping for smart rendering.
+ * You can expand these lists as needed.
+ */
+const PROPERTY_INPUT_TYPES = {
+  // 0-1 range (slider + number)
+  "opacity": "range01",
+  "filter:invert": "range01",
+  "filter:grayscale": "range01",
+  "filter:saturate": "range01",
+  "filter:sepia": "range01",
+  "filter:brightness": "range01",
+  "filter:contrast": "range01",
+  // 0-100 range (slider + number)
+  "filter:blur": "range100",
+  "filter:hue-rotate": "range100",
+  // Color pickers
+  "color": "color",
+  "background-color": "color",
+  "border-color": "color",
+  "outline-color": "color",
+  "text-decoration-color": "color",
+  "box-shadow-color": "color",
+  // Default: text
+};
+
+/**
+ * Helper to get smart input type for a property.
+ * Handles filter sub-properties.
+ */
+function getPropertyInputType(prop) {
+    const p = prop.toLowerCase();
+    if (PROPERTY_INPUT_TYPES[p]) return PROPERTY_INPUT_TYPES[p];
+    // Handle filter:xxx
+    if (p.startsWith("filter:")) {
+        if (PROPERTY_INPUT_TYPES[p]) return PROPERTY_INPUT_TYPES[p];
+        // fallback for filter:blur, filter:hue-rotate, etc.
+        if (p.includes("blur")) return "range100";
+        if (p.includes("hue-rotate")) return "range100";
+        if (p.includes("invert") || p.includes("grayscale") || p.includes("sepia") || p.includes("saturate") || p.includes("brightness") || p.includes("contrast")) return "range01";
+    }
+    // Color properties
+    if (p.includes("color")) return "color";
+    return "text";
+}
+
+/**
+ * Example generator modules.
+ * Add new modules here following the same structure.
+ */
+const generatorModules = {
+    clamp: {
+        title: "Clamp Generator",
+        fields: [
+            { label: "Min Value (px)", placeholder: "e.g. 16", name: "min", default: 16 },
+            { label: "Max Value (px)", placeholder: "e.g. 32", name: "max", default: 32 },
+            { label: "Viewport Min (px)", placeholder: "e.g. 430", name: "minViewport", default: 430 },
+            { label: "Viewport Max (px)", placeholder: "e.g. 1200", name: "maxViewport", default: 1200 }
+        ],
+        calcOutput: ({ min, max, minViewport, maxViewport }) => {
+            const minPx = parseFloat(min);
+            const maxPx = parseFloat(max);
+            const minVW = parseFloat(minViewport);
+            const maxVW = parseFloat(maxViewport);
+            if ([minPx, maxPx, minVW, maxVW].some(isNaN)) return "";
+            const slope = (maxPx - minPx) / (maxVW - minVW) * 100;
+            const base = minPx - (slope * minVW) / 100;
+            return `clamp(${minPx}px, ${base.toFixed(2)}px + ${slope.toFixed(2)}vw, ${maxPx}px)`;
+        }
+    },
+    boxShadow: {
+        title: "Box Shadow Generator",
+        fields: [
+            { label: "Horizontal Offset (px)", placeholder: "e.g. 4", name: "x", default: 4 },
+            { label: "Vertical Offset (px)", placeholder: "e.g. 4", name: "y", default: 4 },
+            { label: "Blur Radius (px)", placeholder: "e.g. 8", name: "blur", default: 8 },
+            { label: "Shadow Color", placeholder: "e.g. #000000", name: "color", default: "#000000", type: "color" }
+        ],
+        calcOutput: ({ x, y, blur, color }) => {
+            if ([x, y, blur].some(v => isNaN(parseFloat(v)))) return "";
+            return `${x}px ${y}px ${blur}px ${color || "#000000"}`;
+        }
+    },
+    borderRadius: {
+        title: "Border Radius Generator",
+        fields: [
+            { label: "Top Left (px)", placeholder: "e.g. 8", name: "tl", default: 8 },
+            { label: "Top Right (px)", placeholder: "e.g. 8", name: "tr", default: 8 },
+            { label: "Bottom Right (px)", placeholder: "e.g. 8", name: "br", default: 8 },
+            { label: "Bottom Left (px)", placeholder: "e.g. 8", name: "bl", default: 8 }
+        ],
+        calcOutput: ({ tl, tr, br, bl }) => {
+            if ([tl, tr, br, bl].some(v => isNaN(parseFloat(v)))) return "";
+            return `${tl}px ${tr}px ${br}px ${bl}px`;
+        }
+    },
+    cubicBezier: {
+        title: "Cubic Bezier Generator",
+        fields: [
+            { label: "P1x", placeholder: "e.g. 0.25", name: "p1x", default: 0.25, type: "number" },
+            { label: "P1y", placeholder: "e.g. 0.1", name: "p1y", default: 0.1, type: "number" },
+            { label: "P2x", placeholder: "e.g. 0.25", name: "p2x", default: 0.25, type: "number" },
+            { label: "P2y", placeholder: "e.g. 1", name: "p2y", default: 1, type: "number" }
+        ],
+        calcOutput: ({ p1x, p1y, p2x, p2y }) => {
+            if ([p1x, p1y, p2x, p2y].some(v => v === "" || isNaN(parseFloat(v)))) return "";
+            return `cubic-bezier(${parseFloat(p1x)}, ${parseFloat(p1y)}, ${parseFloat(p2x)}, ${parseFloat(p2y)})`;
+        },
+        renderPreview: ({ p1x, p1y, p2x, p2y }) => {
+            if ([p1x, p1y, p2x, p2y].some(v => v === "" || isNaN(parseFloat(v)))) return "";
+            const bezier = `cubic-bezier(${parseFloat(p1x)}, ${parseFloat(p1y)}, ${parseFloat(p2x)}, ${parseFloat(p2y)})`;
+            return `
+                <div class="flex flex-col items-center mt-6">
+                    <div class="mb-2 text-xs text-gray-400">Live Preview</div>
+                    <div id="bezierPreviewBox" class="w-24 h-12 bg-green-500 rounded shadow-lg transition-transform duration-700" style="transition-timing-function: ${bezier};"></div>
+                    <button id="bezierAnimateBtn" class="mt-3 px-3 py-1 bg-gray-700 rounded text-xs hover:bg-gray-600 transition">Animate</button>
+                </div>
+            `;
+        }
+    },
+    gradient: {
+        title: "CSS Gradient Generator",
+        fields: [
+            { label: "Gradient Type", name: "type", type: "select", options: [{label:"Linear",value:"linear"}, {label:"Radial",value:"radial"}], default: "linear" },
+            { label: "Direction (deg or keyword)", placeholder: "e.g. 90deg or to right", name: "direction", default: "90deg" },
+        ],
+        calcOutput: (values) => {
+            const { type, direction } = values;
+            let stops = [];
+            for (let i = 1; i <= 4; i++) {
+                const color = values[`color${i}`];
+                const pos = values[`pos${i}`];
+                if (color) {
+                    stops.push(pos ? `${color} ${pos}` : color);
+                }
+            }
+            if (stops.length < 2) return "";
+            if (type === "radial") {
+                return `background-image: radial-gradient(${stops.join(", ")});`;
+            } else {
+                return `background-image: linear-gradient(${direction || "90deg"}, ${stops.join(", ")});`;
+            }
+        },
+        renderPreview: (values) => {
+            const { type, direction } = values;
+            let stops = [];
+            for (let i = 1; i <= 4; i++) {
+                const color = values[`color${i}`];
+                const pos = values[`pos${i}`];
+                if (color) {
+                    stops.push(pos ? `${color} ${pos}` : color);
+                }
+            }
+            if (stops.length < 2) return "";
+            let css;
+            if (type === "radial") {
+                css = `radial-gradient(${stops.join(", ")})`;
+            } else {
+                css = `linear-gradient(${direction || "90deg"}, ${stops.join(", ")})`;
+            }
+            return `
+                <div class="flex flex-col items-center mt-6">
+                    <div class="mb-2 text-xs text-gray-400">Live Preview</div>
+                    <div class="w-48 h-20 rounded shadow-lg border border-gray-600" style="background-image: ${css};"></div>
+                </div>
+            `;
+        }
+    },
+    // --- Enhanced Keyframe Generator Module ---
+    keyframes: {
+        title: "Keyframe Generator",
+        fields: [
+            { label: "Animation Duration (seconds)", placeholder: "e.g. 2", name: "duration", default: "2", type: "number" },
+            { label: "Animation Name", placeholder: "e.g. myAnim", name: "animName", default: "myAnim", type: "text" }
+        ],
+        /**
+         * Generates the @keyframes CSS and animation class.
+         * Returns a string with the full CSS block.
+         */
+        calcOutput: (values) => {
+            if (!values.animName || !values.duration) return "";
+            const safeName = values.animName.replace(/[^\w-]/g, "_");
+            let steps = [0, 50, 100];
+            let css = `@keyframes ${safeName} {\n`;
+            steps.forEach(step => {
+                css += `  ${step}% {\n`;
+                if (values[`transform${step}`]) css += `    transform: ${values[`transform${step}`]};\n`;
+                if (values[`opacity${step}`]) css += `    opacity: ${values[`opacity${step}`]};\n`;
+                // Custom properties
+                if (values[`customProps${step}`]) {
+                    values[`customProps${step}`].forEach(({prop, val}) => {
+                        if (prop && val !== undefined && val !== "") css += `    ${prop}: ${val};\n`;
+                    });
+                }
+                css += `  }\n`;
+            });
+            css += `}\n\n.${safeName}-animation {\n  animation: ${safeName} ${values.duration || 2}s ease-in-out infinite;\n}`;
+            return css;
+        },
+        /**
+         * Renders a live preview box using the generated keyframes.
+         * Injects the CSS into a <style> tag in <head> (scoped by animation name).
+         */
+        renderPreview: (values) => {
+            if (!values.animName || !values.duration) return "";
+            const safeName = values.animName.replace(/[^\w-]/g, "_");
+            let steps = [0, 50, 100];
+            let css = `@keyframes ${safeName} {\n`;
+            steps.forEach(step => {
+                css += `  ${step}% {\n`;
+                if (values[`transform${step}`]) css += `    transform: ${values[`transform${step}`]};\n`;
+                if (values[`opacity${step}`]) css += `    opacity: ${values[`opacity${step}`]};\n`;
+                if (values[`customProps${step}`]) {
+                    values[`customProps${step}`].forEach(({prop, val}) => {
+                        if (prop && val !== undefined && val !== "") css += `    ${prop}: ${val};\n`;
+                    });
+                }
+                css += `  }\n`;
+            });
+            css += `}\n.${safeName}-animation {\n  animation: ${safeName} ${values.duration || 2}s ease-in-out infinite;\n}`;
+            // Inject or update style tag in head
+            let styleTag = document.getElementById("keyframes-style");
+            if (!styleTag) {
+                styleTag = document.createElement("style");
+                styleTag.id = "keyframes-style";
+                document.head.appendChild(styleTag);
+            }
+            styleTag.textContent = css;
+
+            // Preview box
+            return `
+                <div class="flex flex-col items-center mt-6">
+                    <div class="mb-2 text-xs text-gray-400">Live Preview</div>
+                    <div class="w-32 h-16 bg-blue-500 rounded shadow-lg border border-gray-600 flex items-center justify-center ${safeName}-animation transition-all" id="keyframesPreviewBox">
+                        <span class="font-bold text-white">Animate</span>
+                    </div>
+                </div>
+            `;
+        },
+        /**
+         * Custom rendering for the form area to support dynamic custom properties.
+         * Enhanced: Smart input types for custom properties.
+         */
+        renderForm: (formArea, values, updateOutput, openPropertyModal) => {
+            // Helper: Render smart input for a property
+            function renderSmartInput(prop, val, step, idx) {
+                const inputType = getPropertyInputType(prop);
+                const baseName = `customPropInput_${step}_${idx}`;
+                if (inputType === "range01") {
+                    // 0-1 slider + number
+                    const v = val !== undefined && val !== "" ? val : "1";
+                    return `
+                        <div class="flex items-center gap-2 w-full">
+                            <input type="range" min="0" max="1" step="0.01" value="${v}" 
+                                class="smart-range01 w-24 h-2 bg-gray-600 rounded" 
+                                data-step="${step}" data-idx="${idx}" data-prop="${prop}" />
+                            <input type="number" min="0" max="1" step="0.01" value="${v}" 
+                                class="smart-range01-num w-16 p-1 rounded bg-gray-700 text-white border border-gray-600"
+                                data-step="${step}" data-idx="${idx}" data-prop="${prop}" />
+                        </div>
+                    `;
+                } else if (inputType === "range100") {
+                    // 0-100 slider + number
+                    const v = val !== undefined && val !== "" ? val : "100";
+                    return `
+                        <div class="flex items-center gap-2 w-full">
+                            <input type="range" min="0" max="100" step="1" value="${v}" 
+                                class="smart-range100 w-24 h-2 bg-gray-600 rounded" 
+                                data-step="${step}" data-idx="${idx}" data-prop="${prop}" />
+                            <input type="number" min="0" max="100" step="1" value="${v}" 
+                                class="smart-range100-num w-16 p-1 rounded bg-gray-700 text-white border border-gray-600"
+                                data-step="${step}" data-idx="${idx}" data-prop="${prop}" />
+                        </div>
+                    `;
+                } else if (inputType === "color") {
+                    // Color picker + text
+                    const v = val !== undefined && val !== "" ? val : "#ffffff";
+                    // Try to parse as color, fallback to #fff
+                    let colorVal = "#ffffff";
+                    if (/^#([0-9a-f]{3,8})$/i.test(v)) colorVal = v;
+                    else if (/^rgb|hsl|var\(/i.test(v)) colorVal = "#ffffff";
+                    return `
+                        <div class="flex items-center gap-2 w-full">
+                            <input type="color" value="${colorVal}" 
+                                class="smart-color w-8 h-8 p-0 border-0 bg-transparent"
+                                data-step="${step}" data-idx="${idx}" data-prop="${prop}" />
+                            <input type="text" value="${v}" 
+                                class="smart-color-text flex-1 p-2 rounded bg-gray-700 text-white border border-gray-600"
+                                data-step="${step}" data-idx="${idx}" data-prop="${prop}" placeholder="#ffffff or rgb(...)" />
+                        </div>
+                    `;
+                } else {
+                    // Default: text input
+                    return `
+                        <input type="text" value="${val !== undefined ? val : ""}" 
+                            class="smart-text w-full p-2 rounded bg-gray-700 text-white border border-gray-600"
+                            data-step="${step}" data-idx="${idx}" data-prop="${prop}" placeholder="Value" />
+                    `;
+                }
+            }
+
+            // Render custom property fields for a step
+            function renderCustomProps(step) {
+                const props = values[`customProps${step}`] || [];
+                return `
+                  <div class="space-y-2" id="customPropsFields${step}">
+                    ${props.map((item, idx) => `
+                      <div class="flex flex-col md:flex-row md:items-center gap-2 bg-gray-800 rounded p-2">
+                        <div class="flex items-center gap-2 w-full md:w-1/3">
+                          <span class="text-xs text-gray-400 truncate">${item.prop}</span>
+                          <button type="button" class="remove-prop-btn text-red-400 hover:text-red-600" title="Remove" data-step="${step}" data-idx="${idx}">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                          </button>
+                        </div>
+                        <div class="flex-1">${renderSmartInput(item.prop, item.val, step, idx)}</div>
+                      </div>
+                    `).join("")}
+                  </div>
+                `;
+            }
+
+            // Render for each keyframe step
+            const steps = [
+                { step: 0, label: "0%" },
+                { step: 50, label: "50%" },
+                { step: 100, label: "100%" }
+            ];
+            let stepsHTML = steps.map(({step, label}) => `
+              <div class="mb-6 p-4 rounded-lg bg-gray-700">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="font-semibold text-base">${label} Keyframe</span>
+                  <button type="button" class="add-prop-btn flex items-center gap-1 px-2 py-1 bg-gray-800 rounded text-xs text-green-400 hover:bg-gray-600 transition"
+                    data-step="${step}">
+                    <span class="text-lg leading-none">➕</span> Add Property
+                  </button>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-sm mb-1">Transform</label>
+                    <input type="text" name="transform${step}" class="live-input w-full p-2 rounded bg-gray-800 text-white border border-gray-600"
+                      placeholder="e.g. translateX(0px)" value="${values[`transform${step}`] ?? (step === 0 || step === 100 ? "translateX(0px)" : "translateX(100px)")}" />
+                  </div>
+                  <div>
+                    <label class="block text-sm mb-1">Opacity</label>
+                    <input type="number" name="opacity${step}" class="live-input w-full p-2 rounded bg-gray-800 text-white border border-gray-600"
+                      placeholder="e.g. 1" step="any" value="${values[`opacity${step}`] ?? (step === 50 ? "0.5" : "1")}" />
+                  </div>
+                </div>
+                <div class="mt-4">
+                  <div class="text-xs text-gray-400 mb-1">Custom Properties</div>
+                  ${renderCustomProps(step)}
+                </div>
+              </div>
+            `).join("");
+
+            // Main animation settings
+            let mainFieldsHTML = `
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label class="block text-sm mb-1">Animation Duration (seconds)</label>
+                  <input type="number" name="duration" class="live-input w-full p-2 rounded bg-gray-700 text-white border border-gray-600"
+                    placeholder="e.g. 2" step="any" value="${values.duration ?? "2"}" />
+                </div>
+                <div>
+                  <label class="block text-sm mb-1">Animation Name</label>
+                  <input type="text" name="animName" class="live-input w-full p-2 rounded bg-gray-700 text-white border border-gray-600"
+                    placeholder="e.g. myAnim" value="${values.animName ?? "myAnim"}" />
+                </div>
+              </div>
+            `;
+
+            formArea.innerHTML = `
+              <h2 class="text-xl font-semibold mb-4">Keyframe Generator</h2>
+              ${mainFieldsHTML}
+              ${stepsHTML}
+              <div id="outputBox" class="mt-4 p-4 bg-gray-700 text-sm rounded text-green-400 font-mono cursor-pointer" title="Click to copy"></div>
+              <div id="previewArea"></div>
+            `;
+
+            // Attach input listeners for main fields
+            formArea.querySelectorAll(".live-input").forEach(input => {
+                input.addEventListener("input", () => updateOutput());
+            });
+
+            // Add property button logic
+            formArea.querySelectorAll(".add-prop-btn").forEach(btn => {
+                btn.addEventListener("click", (e) => {
+                    const step = btn.getAttribute("data-step");
+                    openPropertyModal(step);
+                });
+            });
+
+            // Remove property button logic
+            formArea.querySelectorAll(".remove-prop-btn").forEach(btn => {
+                btn.addEventListener("click", (e) => {
+                    const step = btn.getAttribute("data-step");
+                    const idx = btn.getAttribute("data-idx");
+                    if (values[`customProps${step}`]) {
+                        values[`customProps${step}`].splice(idx, 1);
+                        updateOutput(true); // true = rerender form
+                    }
+                });
+            });
+
+            // --- Smart input listeners for custom properties ---
+            // 0-1 range
+            formArea.querySelectorAll(".smart-range01").forEach(input => {
+                input.addEventListener("input", (e) => {
+                    const step = input.getAttribute("data-step");
+                    const idx = input.getAttribute("data-idx");
+                    const v = input.value;
+                    if (values[`customProps${step}`] && values[`customProps${step}`][idx]) {
+                        values[`customProps${step}`][idx].val = v;
+                        // Sync number input
+                        const num = formArea.querySelector(`.smart-range01-num[data-step="${step}"][data-idx="${idx}"]`);
+                        if (num) num.value = v;
+                        updateOutput();
+                    }
+                });
+            });
+            formArea.querySelectorAll(".smart-range01-num").forEach(input => {
+                input.addEventListener("input", (e) => {
+                    const step = input.getAttribute("data-step");
+                    const idx = input.getAttribute("data-idx");
+                    let v = input.value;
+                    if (v < 0) v = 0;
+                    if (v > 1) v = 1;
+                    if (values[`customProps${step}`] && values[`customProps${step}`][idx]) {
+                        values[`customProps${step}`][idx].val = v;
+                        // Sync slider
+                        const slider = formArea.querySelector(`.smart-range01[data-step="${step}"][data-idx="${idx}"]`);
+                        if (slider) slider.value = v;
+                        updateOutput();
+                    }
+                });
+            });
+            // 0-100 range
+            formArea.querySelectorAll(".smart-range100").forEach(input => {
+                input.addEventListener("input", (e) => {
+                    const step = input.getAttribute("data-step");
+                    const idx = input.getAttribute("data-idx");
+                    const v = input.value;
+                    if (values[`customProps${step}`] && values[`customProps${step}`][idx]) {
+                        values[`customProps${step}`][idx].val = v;
+                        // Sync number input
+                        const num = formArea.querySelector(`.smart-range100-num[data-step="${step}"][data-idx="${idx}"]`);
+                        if (num) num.value = v;
+                        updateOutput();
+                    }
+                });
+            });
+            formArea.querySelectorAll(".smart-range100-num").forEach(input => {
+                input.addEventListener("input", (e) => {
+                    const step = input.getAttribute("data-step");
+                    const idx = input.getAttribute("data-idx");
+                    let v = input.value;
+                    if (v < 0) v = 0;
+                    if (v > 100) v = 100;
+                    if (values[`customProps${step}`] && values[`customProps${step}`][idx]) {
+                        values[`customProps${step}`][idx].val = v;
+                        // Sync slider
+                        const slider = formArea.querySelector(`.smart-range100[data-step="${step}"][data-idx="${idx}"]`);
+                        if (slider) slider.value = v;
+                        updateOutput();
+                    }
+                });
+            });
+            // Color picker
+            formArea.querySelectorAll(".smart-color").forEach(input => {
+                input.addEventListener("input", (e) => {
+                    const step = input.getAttribute("data-step");
+                    const idx = input.getAttribute("data-idx");
+                    const v = input.value;
+                    if (values[`customProps${step}`] && values[`customProps${step}`][idx]) {
+                        values[`customProps${step}`][idx].val = v;
+                        // Sync text input
+                        const txt = formArea.querySelector(`.smart-color-text[data-step="${step}"][data-idx="${idx}"]`);
+                        if (txt) txt.value = v;
+                        updateOutput();
+                    }
+                });
+            });
+            formArea.querySelectorAll(".smart-color-text").forEach(input => {
+                input.addEventListener("input", (e) => {
+                    const step = input.getAttribute("data-step");
+                    const idx = input.getAttribute("data-idx");
+                    const v = input.value;
+                    if (values[`customProps${step}`] && values[`customProps${step}`][idx]) {
+                        values[`customProps${step}`][idx].val = v;
+                        // Sync color input if valid hex
+                        const color = formArea.querySelector(`.smart-color[data-step="${step}"][data-idx="${idx}"]`);
+                        if (color && /^#([0-9a-f]{3,8})$/i.test(v)) color.value = v;
+                        updateOutput();
+                    }
+                });
+            });
+            // Text input
+            formArea.querySelectorAll(".smart-text").forEach(input => {
+                input.addEventListener("input", (e) => {
+                    const step = input.getAttribute("data-step");
+                    const idx = input.getAttribute("data-idx");
+                    const v = input.value;
+                    if (values[`customProps${step}`] && values[`customProps${step}`][idx]) {
+                        values[`customProps${step}`][idx].val = v;
+                        updateOutput();
+                    }
+                });
+            });
+
+            // Click-to-copy
+            const outputDiv = formArea.querySelector("#outputBox");
+            outputDiv.addEventListener("click", () => {
+                const text = outputDiv.textContent;
+                if (text) {
+                    navigator.clipboard.writeText(text);
+                    outputDiv.classList.add("bg-green-800");
+                    setTimeout(() => outputDiv.classList.remove("bg-green-800"), 400);
+                }
+            });
+        }
+    }
+};
+
+// Populate sidebar and dropdown dynamically
+const sidebarLinks = document.getElementById('sidebarLinks');
+const generatorSelector = document.getElementById('generatorSelector');
+sidebarLinks.innerHTML = "";
+generatorSelector.innerHTML = "";
+Object.entries(generatorModules).forEach(([key, mod]) => {
+    // Sidebar
+    const li = document.createElement('li');
+    li.innerHTML = `<button data-gen="${key}" class="sidebar-link w-full text-left px-3 py-2 rounded hover:bg-gray-700 transition">${mod.title}</button>`;
+    sidebarLinks.appendChild(li);
+    // Dropdown
+    const opt = document.createElement('option');
+    opt.value = key;
+    opt.textContent = mod.title;
+    generatorSelector.appendChild(opt);
+});
+
+const formArea = document.getElementById('formArea');
+
+// Sidebar toggle logic
+const sidebar = document.getElementById('sidebar');
+const openSidebarBtn = document.getElementById('openSidebar');
+const closeSidebarBtn = document.getElementById('closeSidebar');
+function openSidebar() { sidebar.classList.remove('-translate-x-full'); }
+function closeSidebar() { sidebar.classList.add('-translate-x-full'); }
+openSidebarBtn.addEventListener('click', openSidebar);
+closeSidebarBtn.addEventListener('click', closeSidebar);
+document.addEventListener('click', (e) => {
+    if (
+        window.innerWidth < 768 &&
+        !sidebar.contains(e.target) &&
+        !openSidebarBtn.contains(e.target)
+    ) {
+        closeSidebar();
+    }
+});
+
+// Sidebar navigation logic
+function attachSidebarLinks() {
+    document.querySelectorAll('.sidebar-link').forEach(link => {
+        link.addEventListener('click', (e) => {
+            const gen = e.target.getAttribute('data-gen');
+            generatorSelector.value = gen;
+            renderForm(gen);
+            if (window.innerWidth < 768) closeSidebar();
+        });
+    });
+}
+attachSidebarLinks();
+
+// Dropdown logic (for mobile/fallback)
+generatorSelector.addEventListener('change', (e) => {
+    const selected = e.target.value;
+    renderForm(selected);
+});
+
+// --- Modal logic for property picker ---
+const propertyModal = document.getElementById("propertyModal");
+const closePropertyModalBtn = document.getElementById("closePropertyModal");
+const propertySearch = document.getElementById("propertySearch");
+const propertyList = document.getElementById("propertyList");
+let propertyModalStep = null;
+let propertyModalCallback = null;
+
+// Show modal and set callback
+function showPropertyModal(step, onSelect) {
+    propertyModalStep = step;
+    propertyModalCallback = onSelect;
+    propertyModal.classList.remove("hidden");
+    propertySearch.value = "";
+    renderPropertyList("");
+    propertySearch.focus();
+}
+
+// Hide modal
+function hidePropertyModal() {
+    propertyModal.classList.add("hidden");
+    propertyModalStep = null;
+    propertyModalCallback = null;
+}
+
+// Render property list with search
+function renderPropertyList(filter) {
+    const filtered = CSS_PROPERTIES.filter(p => p.toLowerCase().includes(filter.toLowerCase()));
+    propertyList.innerHTML = filtered.length
+      ? filtered.map(prop => `
+        <button type="button" class="property-item w-full text-left px-2 py-1 rounded hover:bg-gray-700 transition" data-prop="${prop}">
+          ${prop}
+        </button>
+      `).join("")
+      : `<div class="text-gray-400 text-sm px-2 py-2">No properties found.</div>`;
+    // Attach click listeners
+    propertyList.querySelectorAll(".property-item").forEach(btn => {
+        btn.addEventListener("click", () => {
+            if (propertyModalCallback) propertyModalCallback(btn.getAttribute("data-prop"), propertyModalStep);
+            hidePropertyModal();
+        });
+    });
+}
+
+// Modal events
+closePropertyModalBtn.addEventListener("click", hidePropertyModal);
+propertyModal.addEventListener("click", (e) => {
+    if (e.target === propertyModal) hidePropertyModal();
+});
+propertySearch.addEventListener("input", (e) => {
+    renderPropertyList(propertySearch.value);
+});
+
+// --- Enhanced Keyframes Form State ---
+let keyframesFormState = {
+    duration: "2",
+    animName: "myAnim",
+    transform0: "translateX(0px)",
+    opacity0: "1",
+    customProps0: [],
+    transform50: "translateX(100px)",
+    opacity50: "0.5",
+    customProps50: [],
+    transform100: "translateX(0px)",
+    opacity100: "1",
+    customProps100: []
+};
+
+// --- Main renderForm logic ---
+function renderForm(key) {
+    const config = generatorModules[key];
+    if (!config) {
+        formArea.innerHTML = "";
+        return;
+    }
+    // Enhanced Keyframes: custom rendering
+    if (key === "keyframes" && typeof config.renderForm === "function") {
+        config.renderForm(formArea, keyframesFormState, updateKeyframesOutput, (step) => {
+            showPropertyModal(step, (prop, stepNum) => {
+                // Prevent duplicates for the same step
+                let arr = keyframesFormState[`customProps${stepNum}`] || [];
+                if (!arr.some(item => item.prop === prop)) {
+                    arr.push({prop, val: ""});
+                    keyframesFormState[`customProps${stepNum}`] = arr;
+                    updateKeyframesOutput(true); // true = rerender form
+                }
+            });
+        });
+        updateKeyframesOutput();
+        return;
+    }
+
+    // Default rendering for other modules
+    let fieldsHTML = config.fields.map(field => {
+        if (field.type === "select") {
+            return `
+                <div class="mb-4">
+                    <label class="block text-sm mb-1">${field.label}</label>
+                    <select name="${field.name}" class="live-input w-full p-2 rounded bg-gray-700 text-white border border-gray-600">
+                        ${field.options.map(opt => `<option value="${opt.value}" ${opt.value === field.default ? "selected" : ""}>${opt.label}</option>`).join("")}
+                    </select>
+                </div>
+            `;
+        } else {
+            return `
+                <div class="mb-4">
+                    <label class="block text-sm mb-1">${field.label}</label>
+                    <input 
+                        type="${field.type || 'number'}"
+                        name="${field.name}"
+                        placeholder="${field.placeholder || ""}"
+                        value="${field.default ?? ''}"
+                        class="live-input w-full p-2 rounded bg-gray-700 text-white border border-gray-600"
+                        ${field.type === 'color' ? '' : 'step="any"'}
+                    />
+                </div>
+            `;
+        }
+    }).join('');
+
+    // Special handling for gradient color stops
+    if (key === "gradient") {
+        fieldsHTML += `
+            <div class="mb-2 font-semibold text-sm mt-2">Color Stops</div>
+            <div class="grid grid-cols-2 gap-2 mb-2">
+                <input type="color" name="color1" class="live-input w-full h-10 p-0 border-0 bg-transparent" value="#ff0000" />
+                <input type="text" name="pos1" class="live-input w-full p-2 rounded bg-gray-700 text-white border border-gray-600" placeholder="e.g. 0%" value="0%" />
+                <input type="color" name="color2" class="live-input w-full h-10 p-0 border-0 bg-transparent" value="#0000ff" />
+                <input type="text" name="pos2" class="live-input w-full p-2 rounded bg-gray-700 text-white border border-gray-600" placeholder="e.g. 100%" value="100%" />
+                <input type="color" name="color3" class="live-input w-full h-10 p-0 border-0 bg-transparent" value="#00ff00" />
+                <input type="text" name="pos3" class="live-input w-full p-2 rounded bg-gray-700 text-white border border-gray-600" placeholder="optional" value="" />
+                <input type="color" name="color4" class="live-input w-full h-10 p-0 border-0 bg-transparent" value="#ffffff" />
+                <input type="text" name="pos4" class="live-input w-full p-2 rounded bg-gray-700 text-white border border-gray-600" placeholder="optional" value="" />
+            </div>
+            <div class="text-xs text-gray-400 mb-2">At least two color stops required. Position is optional (e.g. 0%, 50%, 100%).</div>
+        `;
+    }
+
+    formArea.innerHTML = `
+        <h2 class="text-xl font-semibold mb-4">${config.title}</h2>
+        ${fieldsHTML}
+        <div id="outputBox" class="mt-4 p-4 bg-gray-700 text-sm rounded text-green-400 font-mono cursor-pointer" title="Click to copy"></div>
+        <div id="previewArea"></div>
+    `;
+    // Listen for input changes and update output
+    const inputs = formArea.querySelectorAll(".live-input");
+    inputs.forEach(input => {
+        input.addEventListener("input", () => updateOutput(config));
+    });
+    // Click-to-copy
+    const outputDiv = formArea.querySelector("#outputBox");
+    outputDiv.addEventListener("click", () => {
+        const text = outputDiv.textContent;
+        if (text) {
+            navigator.clipboard.writeText(text);
+            outputDiv.classList.add("bg-green-800");
+            setTimeout(() => outputDiv.classList.remove("bg-green-800"), 400);
+        }
+    });
+    updateOutput(config);
+}
+
+// --- Enhanced Keyframes Output/Preview Logic ---
+function updateKeyframesOutput(rerenderForm = false) {
+    // Gather values from form
+    const form = formArea;
+    if (!rerenderForm) {
+        ["duration", "animName"].forEach(name => {
+            const el = form.querySelector(`[name="${name}"]`);
+            if (el) keyframesFormState[name] = el.value;
+        });
+        [0, 50, 100].forEach(step => {
+            const tEl = form.querySelector(`[name="transform${step}"]`);
+            if (tEl) keyframesFormState[`transform${step}`] = tEl.value;
+            const oEl = form.querySelector(`[name="opacity${step}"]`);
+            if (oEl) keyframesFormState[`opacity${step}`] = oEl.value;
+            // Custom property values handled by smart input listeners
+        });
+    }
+    // Generate output
+    const config = generatorModules.keyframes;
+    const output = config.calcOutput(keyframesFormState);
+    const outputDiv = document.getElementById("outputBox");
+    if (outputDiv) outputDiv.textContent = output ? output : "";
+
+    // Live preview
+    const previewArea = document.getElementById("previewArea");
+    if (typeof config.renderPreview === "function") {
+        previewArea.innerHTML = config.renderPreview(keyframesFormState);
+    } else if (previewArea) {
+        previewArea.innerHTML = "";
+    }
+    // If rerendering form (after adding/removing property), rerender the form
+    if (rerenderForm) {
+        config.renderForm(formArea, keyframesFormState, updateKeyframesOutput, (step) => {
+            showPropertyModal(step, (prop, stepNum) => {
+                let arr = keyframesFormState[`customProps${stepNum}`] || [];
+                if (!arr.some(item => item.prop === prop)) {
+                    arr.push({prop, val: ""});
+                    keyframesFormState[`customProps${stepNum}`] = arr;
+                    updateKeyframesOutput(true);
+                }
+            });
+        });
+    }
+}
+
+// --- Default updateOutput for other modules ---
+function updateOutput(config) {
+    const inputs = formArea.querySelectorAll(".live-input");
+    const values = {};
+    inputs.forEach(input => {
+        if (input.type === "checkbox") {
+            values[input.name] = input.checked;
+        } else {
+            values[input.name] = input.value;
+        }
+    });
+    const output = config.calcOutput(values);
+    const outputDiv = document.getElementById("outputBox");
+    outputDiv.textContent = output ? output : "";
+
+    // If preview is supported
+    const previewArea = document.getElementById("previewArea");
+    if (typeof config.renderPreview === "function") {
+        previewArea.innerHTML = config.renderPreview(values);
+        // Add animation logic for cubicBezier
+        if (config.title === "Cubic Bezier Generator") {
+            const box = document.getElementById("bezierPreviewBox");
+            const btn = document.getElementById("bezierAnimateBtn");
+            if (box && btn) {
+                let animating = false;
+                btn.addEventListener("click", () => {
+                    if (animating) return;
+                    animating = true;
+                    box.style.transform = "translateX(120px)";
+                    setTimeout(() => {
+                        box.style.transform = "translateX(0px)";
+                        setTimeout(() => { animating = false; }, 700);
+                    }, 700);
+                });
+                // Animate on hover
+                box.addEventListener("mouseenter", () => {
+                    if (animating) return;
+                    animating = true;
+                    box.style.transform = "translateX(120px)";
+                    setTimeout(() => {
+                        box.style.transform = "translateX(0px)";
+                        setTimeout(() => { animating = false; }, 700);
+                    }, 700);
+                });
+            }
+        }
+    } else if (previewArea) {
+        previewArea.innerHTML = "";
+    }
+}
+
+// Optionally, select the first generator by default
+generatorSelector.selectedIndex = 0;
+renderForm(generatorSelector.value);
+
+// Re-attach sidebar links after re-render
+attachSidebarLinks();
+    </script>
+</body>
+</html>
