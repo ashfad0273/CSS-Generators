@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Cubic Bezier Generator</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex items-center justify-center p-6">
+    
+    <div id="sidebar-container"></div>
+
+   
+    <main class="w-full max-w-lg bg-gray-800 p-6 rounded-lg shadow-lg">
+        <h1 class="text-2xl font-bold mb-4 text-center">Cubic Bezier Generator</h1>
+
+        <div class="mb-4">
+            <label class="block text-sm mb-1">Presets</label>
+            <select id="presetSelect" class="w-full p-2 rounded bg-gray-700 text-white border border-gray-600">
+                <!-- options populated by JS -->
+            </select>
+        </div>
+
+        <form id="bezierForm" class="grid grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm mb-1">P1x</label>
+                <input type="number" step="any" name="p1x" value="0.25" class="w-full p-2 rounded bg-gray-700 text-white border border-gray-600" />
+            </div>
+            <div>
+                <label class="block text-sm mb-1">P1y</label>
+                <input type="number" step="any" name="p1y" value="0.1" class="w-full p-2 rounded bg-gray-700 text-white border border-gray-600" />
+            </div>
+            <div>
+                <label class="block text-sm mb-1">P2x</label>
+                <input type="number" step="any" name="p2x" value="0.25" class="w-full p-2 rounded bg-gray-700 text-white border border-gray-600" />
+            </div>
+            <div>
+                <label class="block text-sm mb-1">P2y</label>
+                <input type="number" step="any" name="p2y" value="1" class="w-full p-2 rounded bg-gray-700 text-white border border-gray-600" />
+            </div>
+        </form>
+
+        <div id="outputBox" class="mt-4 p-3 bg-gray-700 text-sm rounded text-green-400 font-mono cursor-pointer" title="Click to copy"></div>
+
+        <div id="previewArea" class="mt-6 flex flex-col items-center">
+            <div class="mb-2 text-xs text-gray-400">Live Preview</div>
+            <div id="bezierPreviewBox" class="w-32 h-12 bg-green-500 rounded shadow-lg transition-transform duration-700" style="transition-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1);"></div>
+            <button id="bezierAnimateBtn" class="mt-3 px-3 py-1 bg-gray-700 rounded text-xs hover:bg-gray-600 transition">Animate</button>
+        </div>
+    </main>
+
+    <script>
+        const form = document.getElementById('bezierForm');
+        const outputBox = document.getElementById('outputBox');
+        const previewBox = document.getElementById('bezierPreviewBox');
+        const animateBtn = document.getElementById('bezierAnimateBtn');
+        const presetSelect = document.getElementById('presetSelect');
+
+        const presets = [
+            { name: "ease", vals: [0.25, 0.1, 0.25, 1] },
+            { name: "linear", vals: [0, 0, 1, 1] },
+            { name: "ease-in", vals: [0.42, 0, 1, 1] },
+            { name: "ease-out", vals: [0, 0, 0.58, 1] },
+            { name: "ease-in-out", vals: [0.42, 0, 0.58, 1] },
+            { name: "easeInQuad", vals: [0.55, 0.085, 0.68, 0.53] },
+            { name: "easeOutQuad", vals: [0.25, 0.46, 0.45, 0.94] },
+            { name: "easeInOutQuad", vals: [0.455, 0.03, 0.515, 0.955] },
+            { name: "easeInCubic", vals: [0.55, 0.055, 0.675, 0.19] },
+            { name: "easeOutCubic", vals: [0.215, 0.61, 0.355, 1] },
+            { name: "easeInOutCubic", vals: [0.645, 0.045, 0.355, 1] },
+            { name: "easeInQuart", vals: [0.895, 0.03, 0.685, 0.22] },
+            { name: "easeOutQuart", vals: [0.165, 0.84, 0.44, 1] },
+            { name: "easeInOutQuart", vals: [0.77, 0, 0.175, 1] },
+            { name: "easeInQuint", vals: [0.755, 0.05, 0.855, 0.06] },
+            { name: "easeOutQuint", vals: [0.23, 1, 0.32, 1] },
+            { name: "easeInOutQuint", vals: [0.86, 0, 0.07, 1] },
+            { name: "elastic-ish", vals: [0.68, -0.55, 0.27, 1.55] },
+            { name: "bounce-ish", vals: [0.68, -0.6, 0.32, 1.6] },
+            { name: "snappy", vals: [0.6, -0.28, 0.735, 0.045] },
+            { name: "softStart", vals: [0.2, 0.9, 0.4, 1] },
+            { name: "softEnd", vals: [0.1, 0.2, 0.35, 0.95] },
+            { name: "pop", vals: [0.18, 1.4, 0.5, 1.1] },
+            { name: "springy", vals: [0.5, -0.6, 0.35, 1.5] },
+            { name: "overshoot", vals: [0.8, -0.35, 0.25, 1.15] },
+            { name: "gentleEase", vals: [0.3, 0.12, 0.4, 0.88] },
+            { name: "snappySharp", vals: [0.9, 0.02, 0.15, 0.8] },
+            { name: "softBounce", vals: [0.6, -0.45, 0.28, 1.4] },
+            { name: "jolt", vals: [0.45, -0.2, 0.6, 1.25] },
+            { name: "dragSlow", vals: [0.25, 0.7, 0.5, 0.9] },
+            { name: "floatUp", vals: [0.2, 0.0, 0.1, 1.0] },
+            { name: "snapBack", vals: [0.85, -0.7, 0.25, 1.7] },
+            { name: "lazyMotion", vals: [0.9, 0.25, 0.9, 0.6] },
+            { name: "rapidKick", vals: [0.05, 0.75, 0.45, 0.95] },
+            { name: "swing", vals: [0.55, 1.3, 0.1, 0.1] },
+            { name: "hesitate", vals: [0.6, -0.05, 0.4, 0.95] },
+            { name: "slinky", vals: [0.47, -0.6, 0.22, 1.45] },
+            { name: "surge", vals: [0.12, 0.92, 0.18, 1.02] },
+            { name: "plummet", vals: [0.2, 0.0, 0.1, 0.25] },
+            { name: "wobble", vals: [0.68, -0.28, 0.34, 0.95] },
+            { name: "quickStart", vals: [0.14, 0.9, 0.2, 1] },
+            { name: "slowFinish", vals: [0.2, 0.3, 0.2, 0.95] },
+            { name: "softPunch", vals: [0.28, 1.2, 0.36, 0.9] },
+            { name: "hardPunch", vals: [0.95, -0.4, 0.2, 1.25] },
+            { name: "relax", vals: [0.32, 0.16, 0.56, 0.95] },
+            { name: "snapTiny", vals: [0.7, -0.1, 0.85, 0.02] },
+            { name: "backEase", vals: [0.1, 1.4, 0.3, 1] },
+            { name: "forwardEase", vals: [0.6, 0.05, 0.9, 0.4] },
+            { name: "giddy", vals: [0.4, 1.1, 0.2, 0.85] },
+            { name: "suddenStop", vals: [0.2, 0.05, 0.2, 0.15] },
+            { name: "slowDrift", vals: [0.35, 0.9, 0.6, 0.95] },
+            { name: "fastKick", vals: [0.08, 1.1, 0.22, 0.9] },
+            { name: "floaty", vals: [0.25, -0.1, 0.15, 1.15] },
+            { name: "bouncySmall", vals: [0.6, -0.2, 0.4, 1.2] },
+            { name: "bouncyBig", vals: [0.75, -0.8, 0.25, 1.6] },
+            { name: "elasticTap", vals: [0.4, -0.45, 0.3, 1.35] },
+            { name: "whee", vals: [0.05, 0.9, 0.4, 0.9] },
+            { name: "hesitant", vals: [0.48, -0.05, 0.35, 0.9] },
+            { name: "overshootSoft", vals: [0.82, -0.15, 0.3, 1.05] },
+            { name: "overshootHard", vals: [0.95, -0.45, 0.25, 1.25] },
+            { name: "stallThenGo", vals: [0.15, 0.7, 0.35, 0.95] },
+            { name: "zip", vals: [0.02, 0.8, 0.45, 0.98] },
+            { name: "linger", vals: [0.6, 0.25, 0.7, 0.4] },
+            { name: "lazyFloat", vals: [0.92, 0.18, 0.92, 0.45] },
+            { name: "kickBack", vals: [0.86, -0.35, 0.18, 1.15] },
+            { name: "sweep", vals: [0.25, 0.2, 0.75, 0.9] },
+            { name: "suddenRise", vals: [0.1, -0.2, 0.15, 1.1] },
+            { name: "softDrop", vals: [0.3, 0.05, 0.15, 0.25] },
+            { name: "fastThenBounce", vals: [0.18, 1.6, 0.32, 0.9] },
+            { name: "slowThenPop", vals: [0.35, 0.1, 0.45, 1.4] },
+            { name: "twitch", vals: [0.55, -0.35, 0.6, 0.15] },
+            { name: "slinkyLite", vals: [0.4, -0.3, 0.25, 1.25] },
+            { name: "springShort", vals: [0.5, -0.8, 0.2, 1.8] },
+            { name: "springLong", vals: [0.3, -0.95, 0.15, 1.85] },
+            { name: "wideArc", vals: [0.15, 0.85, 0.72, 0.9] },
+            { name: "tightArc", vals: [0.4, 0.02, 0.6, 0.98] },
+            { name: "microBounce", vals: [0.58, -0.08, 0.64, 0.12] },
+            { name: "driftAway", vals: [0.28, 0.65, 0.5, 0.85] },
+            { name: "snapReverse", vals: [0.95, 0.02, 0.08, 0.8] },
+            { name: "sprint", vals: [0.05, 0.6, 0.8, 0.9] }
+        ];
+
+        function populatePresets() {
+            // add a default custom option
+            const customOpt = document.createElement('option');
+            customOpt.value = "custom";
+            customOpt.textContent = "Custom / current";
+            presetSelect.appendChild(customOpt);
+
+            presets.forEach((p, i) => {
+                const opt = document.createElement('option');
+                opt.value = i; // index
+                // show serial number + preset name ONLY (no raw control point values)
+                const serial = String(i + 1).padStart(2, '0');
+                opt.textContent = `${serial}. ${p.name}`;
+                presetSelect.appendChild(opt);
+            });
+        }
+
+        function applyPreset(index) {
+            if (index === "custom") return;
+            const p = presets[Number(index)];
+            if (!p) return;
+            // set form inputs
+            const [p1x, p1y, p2x, p2y] = p.vals;
+            form.querySelector('[name="p1x"]').value = p1x;
+            form.querySelector('[name="p1y"]').value = p1y;
+            form.querySelector('[name="p2x"]').value = p2x;
+            form.querySelector('[name="p2y"]').value = p2y;
+            update();
+        }
+
+        function getValues() {
+            const data = {};
+            new FormData(form).forEach((v, k) => data[k] = v);
+            return data;
+        }
+
+        function calcBezier(values) {
+            const { p1x, p1y, p2x, p2y } = values;
+            if ([p1x, p1y, p2x, p2y].some(v => v === "" || isNaN(parseFloat(v)))) return "";
+            return `cubic-bezier(${parseFloat(p1x)}, ${parseFloat(p1y)}, ${parseFloat(p2x)}, ${parseFloat(p2y)})`;
+        }
+
+        function update() {
+            const vals = getValues();
+            const bez = calcBezier(vals);
+            // outputBox should display only the cubic-bezier function string (or empty)
+            outputBox.textContent = bez || '';
+            if (bez) previewBox.style.transitionTimingFunction = bez;
+
+            // if current values match a preset, set the select to that preset label
+            const current = [parseFloat(vals.p1x), parseFloat(vals.p1y), parseFloat(vals.p2x), parseFloat(vals.p2y)];
+            let found = "custom";
+            presets.forEach((p, i) => {
+                if (p.vals.every((v, idx) => Math.abs(v - current[idx]) < 1e-6)) found = String(i);
+            });
+            presetSelect.value = found;
+        }
+
+        // initial setup
+        populatePresets();
+        update();
+
+        // live updates
+        form.querySelectorAll('input').forEach(inp => inp.addEventListener('input', update));
+
+        // preset select change
+        presetSelect.addEventListener('change', (e) => {
+            applyPreset(e.target.value);
+        });
+
+        // copy output
+        outputBox.addEventListener('click', async () => {
+            const txt = outputBox.textContent.trim();
+            if (!txt) return;
+            try {
+                await navigator.clipboard.writeText(txt);
+                outputBox.classList.add('bg-green-800');
+                setTimeout(() => outputBox.classList.remove('bg-green-800'), 450);
+            } catch (e) {
+                // ignore
+            }
+        });
+
+        // animation logic
+        let animating = false;
+        function runAnim() {
+            if (animating) return;
+            animating = true;
+            previewBox.style.transform = "translateX(120px)";
+            const dur = 700; // matches duration-700
+            setTimeout(() => {
+                previewBox.style.transform = "translateX(0px)";
+                setTimeout(() => { animating = false; }, dur);
+            }, dur);
+        }
+
+        animateBtn.addEventListener('click', runAnim);
+        previewBox.addEventListener('mouseenter', runAnim);
+    </script>
+<script src="script.js"></script>
+
+</body>
+</html>

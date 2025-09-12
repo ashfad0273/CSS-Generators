@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Box Shadow Generator</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex items-center justify-center p-6">
+
+    <div id="sidebar-container"></div>
+
+    
+    <div class="w-full max-w-5xl">
+        <h1 class="text-2xl md:text-3xl font-extrabold mb-6 text-center">Box Shadow Generator</h1>
+
+        <!-- Main layout: stack on small, two columns on md+ -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Left panel: controls -->
+            <div class="bg-gradient-to-br from-gray-800 to-gray-700 p-5 rounded-2xl border border-gray-700 space-y-5">
+                <!-- Offset & Blur group -->
+                <div class="space-y-4">
+                    <div>
+                        <label for="xRange" class="block text-sm text-gray-300 mb-1">Horizontal Offset (px)</label>
+                        <div class="flex items-center gap-3">
+                            <input id="xRange" type="range" min="-100" max="100" step="1" class="flex-1" />
+                            <input id="xNumber" type="number" min="-100" max="100" step="1" class="w-20 p-2 rounded bg-gray-700 text-white border border-gray-600" />
+                            <button id="xReset" class="px-3 py-2 rounded bg-gray-700 border border-gray-600 hover:bg-gray-700/80 text-sm">Reset</button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="yRange" class="block text-sm text-gray-300 mb-1">Vertical Offset (px)</label>
+                        <div class="flex items-center gap-3">
+                            <input id="yRange" type="range" min="-100" max="100" step="1" class="flex-1" />
+                            <input id="yNumber" type="number" min="-100" max="100" step="1" class="w-20 p-2 rounded bg-gray-700 text-white border border-gray-600" />
+                            <button id="yReset" class="px-3 py-2 rounded bg-gray-700 border border-gray-600 hover:bg-gray-700/80 text-sm">Reset</button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="blurRange" class="block text-sm text-gray-300 mb-1">Blur Radius (px)</label>
+                        <div class="flex items-center gap-3">
+                            <input id="blurRange" type="range" min="0" max="200" step="1" class="flex-1" />
+                            <input id="blurNumber" type="number" min="0" max="200" step="1" class="w-20 p-2 rounded bg-gray-700 text-white border border-gray-600" />
+                            <button id="blurReset" class="px-3 py-2 rounded bg-gray-700 border border-gray-600 hover:bg-gray-700/80 text-sm">Reset</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Color controls -->
+                <div class="space-y-3">
+                    <div class="flex items-center gap-3">
+                        <div class="flex items-center gap-3 w-full">
+                            <div class="flex items-center gap-3">
+                                <label class="text-sm text-gray-300">Shadow Color</label>
+                                <div id="colorSwatch" class="w-8 h-8 rounded border border-gray-600"></div>
+                            </div>
+                            <input id="colorInput" type="color" class="ml-auto w-16 h-10 p-0 bg-transparent border border-gray-600 rounded" />
+                        </div>
+                    </div>
+
+                    <div class="flex gap-3">
+                        <input id="colorText" type="text" class="flex-1 p-2 rounded bg-gray-700 text-white border border-gray-600" placeholder="#000000" />
+                        <button id="colorReset" class="px-4 py-2 rounded bg-gray-700 border border-gray-600 hover:bg-gray-700/80 text-sm">Reset</button>
+                    </div>
+
+                    <div class="text-xs text-gray-400">Use the color picker or paste a hex (e.g. #3490dc). Invalid hex won't update preview.</div>
+                </div>
+            </div>
+
+            <!-- Right panel: output & preview -->
+            <div class="space-y-6">
+                <!-- CSS Output card -->
+                <div class="bg-gradient-to-br from-gray-800 to-gray-700 p-4 rounded-2xl border border-gray-700">
+                    <div class="flex items-start justify-between gap-4">
+                        <div class="flex-1">
+                            <div class="text-sm text-gray-300 mb-2">CSS Output</div>
+                            <div class="flex items-center gap-3">
+                                <pre id="outputBox" class="flex-1 p-3 bg-gray-900/40 rounded font-mono text-sm text-green-400 whitespace-pre-wrap cursor-text" title="Click to copy"></pre>
+                                <button id="copyBtn" class="ml-2 px-3 py-2 rounded bg-green-600 hover:bg-green-700 text-sm font-medium">Copy</button>
+                            </div>
+                            <div class="mt-2 text-xs text-gray-400">Click copy or the output to copy to clipboard.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Live preview card -->
+                <div class="bg-white rounded-2xl p-6 border border-gray-200">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="text-sm text-gray-700 font-medium">Live Preview</div>
+                        <div class="text-xs text-gray-500">Responsive · Rounded · Subtle border</div>
+                    </div>
+
+                    <div class="w-full flex items-center justify-center">
+                        <div class="w-full max-w-xs p-6 bg-gray-50 rounded-lg flex items-center justify-center border border-gray-200">
+                            <div id="preview" class="w-44 h-28 bg-gray-700 rounded-lg transition-shadow" style="box-shadow: 4px 4px 8px #000;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Defaults
+        const defaults = { x: 4, y: 4, blur: 8, color: "#000000" };
+
+        // Elements
+        const xRange = document.getElementById('xRange');
+        const yRange = document.getElementById('yRange');
+        const blurRange = document.getElementById('blurRange');
+        const xNumber = document.getElementById('xNumber');
+        const yNumber = document.getElementById('yNumber');
+        const blurNumber = document.getElementById('blurNumber');
+        const colorInput = document.getElementById('colorInput');
+        const colorText = document.getElementById('colorText');
+        const colorSwatch = document.getElementById('colorSwatch');
+        const outputBox = document.getElementById('outputBox');
+        const preview = document.getElementById('preview');
+        const copyBtn = document.getElementById('copyBtn');
+
+        // Set ranges and initial values
+        xRange.min = -100; xRange.max = 100; xRange.value = defaults.x;
+        yRange.min = -100; yRange.max = 100; yRange.value = defaults.y;
+        blurRange.min = 0; blurRange.max = 200; blurRange.value = defaults.blur;
+
+        xNumber.value = defaults.x;
+        yNumber.value = defaults.y;
+        blurNumber.value = defaults.blur;
+
+        colorInput.value = defaults.color;
+        colorText.value = defaults.color;
+        colorSwatch.style.background = defaults.color;
+
+        // Utility: normalize hex (ensure starts with # and 6-digit)
+        function normalizeHex(v) {
+            if (!v) return '';
+            v = v.trim();
+            if (!v.startsWith('#')) v = '#' + v;
+            if (/^#[0-9a-fA-F]{3}$/.test(v)) {
+                v = v.replace(/^#([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])$/, '#$1$1$2$2$3$3');
+            }
+            if (/^#[0-9a-fA-F]{6}$/.test(v)) return v.toLowerCase();
+            return ''; // invalid
+        }
+
+        // Sync helpers
+        function updateFromRange(range, number) { number.value = range.value; updateAll(); }
+        function updateFromNumber(number, range) {
+            let v = Number(number.value);
+            if (isNaN(v)) v = 0;
+            if (range.min !== undefined && v < Number(range.min)) v = Number(range.min);
+            if (range.max !== undefined && v > Number(range.max)) v = Number(range.max);
+            number.value = v;
+            range.value = v;
+            updateAll();
+        }
+
+        // Color sync
+        function updateColorFromPicker() {
+            const val = normalizeHex(colorInput.value) || colorInput.value;
+            colorText.value = val;
+            colorSwatch.style.background = val;
+            updateAll();
+        }
+        function updateColorFromText() {
+            const val = normalizeHex(colorText.value);
+            if (val) {
+                colorInput.value = val;
+                colorSwatch.style.background = val;
+                colorText.value = val;
+                updateAll();
+            } else {
+                colorSwatch.style.background = 'transparent';
+            }
+        }
+
+        // Reset buttons
+        document.getElementById('xReset').addEventListener('click', () => { xRange.value = defaults.x; updateFromRange(xRange, xNumber); });
+        document.getElementById('yReset').addEventListener('click', () => { yRange.value = defaults.y; updateFromRange(yRange, yNumber); });
+        document.getElementById('blurReset').addEventListener('click', () => { blurRange.value = defaults.blur; updateFromRange(blurRange, blurNumber); });
+        document.getElementById('colorReset').addEventListener('click', () => {
+            colorInput.value = defaults.color; colorText.value = defaults.color; colorSwatch.style.background = defaults.color; updateAll();
+        });
+
+        // Event wiring
+        xRange.addEventListener('input', () => updateFromRange(xRange, xNumber));
+        yRange.addEventListener('input', () => updateFromRange(yRange, yNumber));
+        blurRange.addEventListener('input', () => updateFromRange(blurRange, blurNumber));
+
+        xNumber.addEventListener('change', () => updateFromNumber(xNumber, xRange));
+        yNumber.addEventListener('change', () => updateFromNumber(yNumber, yRange));
+        blurNumber.addEventListener('change', () => updateFromNumber(blurNumber, blurRange));
+
+        colorInput.addEventListener('input', updateColorFromPicker);
+        colorText.addEventListener('change', updateColorFromText);
+        colorText.addEventListener('keyup', (e) => { if (e.key === 'Enter') updateColorFromText(); });
+
+        // Update output & preview
+        function updateAll() {
+            const x = Number(xRange.value) || 0;
+            const y = Number(yRange.value) || 0;
+            const blur = Number(blurRange.value) || 0;
+            const color = normalizeHex(colorText.value) || colorInput.value || '#000000';
+
+            const css = `box-shadow: ${x}px ${y}px ${blur}px ${color};`;
+            outputBox.textContent = css;
+
+            preview.style.boxShadow = `${x}px ${y}px ${blur}px ${color}`;
+            colorSwatch.style.background = color;
+        }
+
+        // Click/copy handlers
+        async function copyText(t) {
+            try {
+                await navigator.clipboard.writeText(t);
+                copyBtn.textContent = 'Copied';
+                copyBtn.classList.add('bg-green-700');
+                setTimeout(() => { copyBtn.textContent = 'Copy'; copyBtn.classList.remove('bg-green-700'); }, 900);
+            } catch (err) {
+                // fallback: select and execCommand
+                try {
+                    const selection = window.getSelection();
+                    const range = document.createRange();
+                    range.selectNodeContents(outputBox);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                    document.execCommand('copy');
+                    selection.removeAllRanges();
+                    copyBtn.textContent = 'Copied';
+                    setTimeout(() => { copyBtn.textContent = 'Copy'; }, 900);
+                } catch (e) {
+                    // ignore
+                }
+            }
+        }
+
+        outputBox.addEventListener('click', () => {
+            const t = outputBox.textContent;
+            if (t) copyText(t);
+        });
+        copyBtn.addEventListener('click', () => {
+            const t = outputBox.textContent;
+            if (t) copyText(t);
+        });
+
+        // Initialize
+        updateAll();
+    </script>
+
+<script src="script.js"></script>
+
+</body>
+</html>

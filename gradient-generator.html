@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Gradient Color Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .modal-bg { background: rgba(17, 24, 39, 0.85); }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex items-center justify-center p-6">
+    
+    <div id="sidebar-container"></div>
+
+   
+    <main class="w-full max-w-2xl bg-gray-800 p-6 rounded-lg shadow-lg">
+        <h1 class="text-2xl font-bold mb-4 text-center">CSS Gradient Generator</h1>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div>
+                <label class="block text-sm mb-1">Gradient Type</label>
+                <select id="type" class="w-full p-2 rounded bg-gray-700 text-white border border-gray-600">
+                    <option value="linear" selected>Linear</option>
+                    <option value="radial">Radial</option>
+                </select>
+            </div>
+
+            <div class="md:col-span-2">
+                <label class="block text-sm mb-1">Direction (deg or keyword)</label>
+                <input id="direction" class="w-full p-2 rounded bg-gray-700 text-white border border-gray-600"
+                             placeholder="e.g. 90deg or to right" value="90deg" />
+            </div>
+        </div>
+
+        <div class="mb-2 font-semibold text-sm">Color Stops (min 2)</div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
+            <div>
+                <input type="color" id="color1" class="w-full h-10 p-0 border-0 bg-transparent" value="#ff0000" />
+                <input id="pos1" class="w-full mt-1 p-2 rounded bg-gray-700 text-white border border-gray-600 text-sm" placeholder="0%" value="0%" />
+            </div>
+            <div>
+                <input type="color" id="color2" class="w-full h-10 p-0 border-0 bg-transparent" value="#0000ff" />
+                <input id="pos2" class="w-full mt-1 p-2 rounded bg-gray-700 text-white border border-gray-600 text-sm" placeholder="100%" value="100%" />
+            </div>
+            <div>
+                <input type="color" id="color3" class="w-full h-10 p-0 border-0 bg-transparent" value="#00ff00" />
+                <input id="pos3" class="w-full mt-1 p-2 rounded bg-gray-700 text-white border border-gray-600 text-sm" placeholder="optional" value="" />
+            </div>
+            <div>
+                <input type="color" id="color4" class="w-full h-10 p-0 border-0 bg-transparent" value="#ffffff" />
+                <input id="pos4" class="w-full mt-1 p-2 rounded bg-gray-700 text-white border border-gray-600 text-sm" placeholder="optional" value="" />
+            </div>
+        </div>
+
+        <div class="flex gap-2 items-center">
+            <button id="generateBtn" class="px-4 py-2 bg-green-600 rounded hover:bg-green-500">Generate</button>
+            <button id="copyBtn" class="px-3 py-2 bg-gray-700 rounded hover:bg-gray-600">Copy CSS</button>
+            <div id="status" class="text-xs text-green-400 ml-2"></div>
+        </div>
+
+        <div id="outputBox" class="mt-4 p-4 bg-gray-700 text-sm rounded text-green-300 font-mono break-words"></div>
+
+        <div id="previewArea" class="mt-6 flex flex-col items-center">
+            <div class="mb-2 text-xs text-gray-400">Live Preview</div>
+            <div id="preview" class="w-full md:w-96 h-28 rounded shadow-lg border border-gray-600"></div>
+        </div>
+    </main>
+
+    <script>
+        // Elements
+        const typeEl = document.getElementById('type');
+        const dirEl = document.getElementById('direction');
+        const colorEls = [1,2,3,4].map(n => document.getElementById('color'+n));
+        const posEls = [1,2,3,4].map(n => document.getElementById('pos'+n));
+        const outputBox = document.getElementById('outputBox');
+        const preview = document.getElementById('preview');
+        const generateBtn = document.getElementById('generateBtn');
+        const copyBtn = document.getElementById('copyBtn');
+        const status = document.getElementById('status');
+
+        function buildStops() {
+            const stops = [];
+            for (let i=0;i<4;i++){
+                const color = colorEls[i].value;
+                const pos = (posEls[i].value || "").trim();
+                // Only include if a color input is present (color inputs always have value)
+                // But consider omitting stops with empty color? color inputs always produce hex.
+                if (color) {
+                    stops.push(pos ? `${color} ${pos}` : color);
+                }
+            }
+            return stops;
+        }
+
+        function buildGradientString() {
+            const type = typeEl.value;
+            const direction = dirEl.value.trim() || '90deg';
+            const stops = buildStops();
+            if (stops.length < 2) return '';
+            if (type === 'radial') {
+                return `radial-gradient(${stops.join(', ')})`;
+            } else {
+                return `linear-gradient(${direction}, ${stops.join(', ')})`;
+            }
+        }
+
+        function updatePreviewAndOutput() {
+            const cssGradient = buildGradientString();
+            if (!cssGradient) {
+                outputBox.textContent = 'Please provide at least two color stops.';
+                preview.style.backgroundImage = '';
+                return;
+            }
+            const fullCss = `background-image: ${cssGradient};`;
+            outputBox.textContent = fullCss;
+            preview.style.backgroundImage = cssGradient;
+        }
+
+        // Wire inputs for live preview
+        [typeEl, dirEl, ...colorEls, ...posEls].forEach(el => {
+            el.addEventListener('input', () => {
+                updatePreviewAndOutput();
+                status.textContent = '';
+            });
+        });
+
+        generateBtn.addEventListener('click', () => {
+            updatePreviewAndOutput();
+            status.textContent = 'Generated';
+            setTimeout(()=> status.textContent = '', 1000);
+        });
+
+        copyBtn.addEventListener('click', () => {
+            const txt = outputBox.textContent;
+            if (!txt) return;
+            navigator.clipboard.writeText(txt).then(() => {
+                status.textContent = 'Copied';
+                setTimeout(()=> status.textContent = '', 1200);
+            });
+        });
+
+        // Initialize
+        updatePreviewAndOutput();
+    </script>
+<script src="script.js"></script>
+
+</body>
+</html>
