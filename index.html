@@ -12,9 +12,7 @@
   </style>
 </head>
 <body class="min-h-screen flex items-center justify-center p-6">
-
-        <div id="sidebar-container"></div>
-
+ <div id="sidebar-container"></div>
 <div class="w-full max-w-lg card p-6 rounded-lg shadow-lg">
   <h1 class="text-2xl font-bold mb-4 text-center">CSS clamp() Generator</h1>
 
@@ -71,11 +69,130 @@
   </div>
 </div>
 
+<script>
+function calcClamp({ min, max, minViewport, maxViewport }) {
+  const minPx = parseFloat(min);
+  const maxPx = parseFloat(max);
+  const minVW = parseFloat(minViewport);
+  const maxVW = parseFloat(maxViewport);
+  if ([minPx, maxPx, minVW, maxVW].some(isNaN)) return "";
+  const slope = (maxPx - minPx) / (maxVW - minVW) * 100;
+  const base = minPx - (slope * minVW) / 100;
+  return `clamp(${minPx}px, ${base.toFixed(2)}px + ${slope.toFixed(2)}vw, ${maxPx}px)`;
+}
 
-<script src="scripts/clamp.js"></script>
-<script src="scripts/script.js"></script>
+const minVal = document.getElementById('minVal');
+const maxVal = document.getElementById('maxVal');
+const minVw = document.getElementById('minVw');
+const maxVw = document.getElementById('maxVw');
+const outputBox = document.getElementById('outputBox');
+const cssSnippet = document.getElementById('cssSnippet');
+const clampType = document.getElementById('clampType');
+const createVarBtn = document.getElementById('createVarBtn');
+const varList = document.getElementById('varList');
+const downloadBtn = document.getElementById('downloadBtn');
+const uploadInput = document.getElementById('uploadInput');
+
+let generatedVars = [];
+
+function update() {
+  const val = calcClamp({
+    min: minVal.value,
+    max: maxVal.value,
+    minViewport: minVw.value,
+    maxViewport: maxVw.value
+  });
+  outputBox.textContent = val || "Invalid input";
+  cssSnippet.textContent = val ? `Use in CSS — .your-class { font-size: ${val}; }` : "";
+}
+
+[minVal, maxVal, minVw, maxVw].forEach(el => el.addEventListener('input', update));
+
+outputBox.addEventListener('click', () => {
+  const txt = outputBox.textContent;
+  if (!txt || txt === "Invalid input") return;
+  navigator.clipboard.writeText(txt);
+  flash(outputBox);
+});
+
+function flash(el) {
+  el.classList.add('bg-green-800');
+  setTimeout(() => el.classList.remove('bg-green-800'), 500);
+}
+
+function renderVarList() {
+  varList.innerHTML = "";
+  generatedVars.forEach((v, i) => {
+    const row = document.createElement('div');
+    row.className = "flex flex-col sm:flex-row gap-2";
+
+    const varBox = document.createElement('div');
+    varBox.className = "flex-1 p-2 rounded bg-gray-800 text-green-300 font-mono text-xs cursor-pointer";
+    varBox.textContent = `--${v.type}-${v.maxVal}: ${v.clampValue}`;
+    varBox.title = "Click to copy full variable";
+    varBox.addEventListener('click', () => {
+      navigator.clipboard.writeText(varBox.textContent);
+      flash(varBox);
+    });
+
+    const refBox = document.createElement('div');
+    refBox.className = "p-2 rounded bg-gray-700 text-blue-300 font-mono text-xs cursor-pointer";
+    refBox.textContent = `var(--${v.type}-${v.maxVal})`;
+    refBox.title = "Click to copy var() reference";
+    refBox.addEventListener('click', () => {
+      navigator.clipboard.writeText(refBox.textContent);
+      flash(refBox);
+    });
+
+    row.appendChild(varBox);
+    row.appendChild(refBox);
+    varList.appendChild(row);
+  });
+}
+
+createVarBtn.addEventListener('click', () => {
+  const clampValue = outputBox.textContent;
+  if (!clampValue || clampValue === "Invalid input") return;
+  const type = clampType.value;
+  const maxValue = maxVal.value;
+  generatedVars.push({ type, maxVal: maxValue, clampValue });
+  renderVarList();
+});
+
+downloadBtn.addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify(generatedVars, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = "clamp-variables.json";
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+uploadInput.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (evt) => {
+    try {
+      const data = JSON.parse(evt.target.result);
+      if (Array.isArray(data)) {
+        generatedVars = data;
+        renderVarList();
+      } else {
+        alert("Invalid JSON format");
+      }
+    } catch (err) {
+      alert("Error parsing JSON");
+    }
+  };
+  reader.readAsText(file);
+});
+
+// Initialize
+update();
+</script>
+
+  <script src="scripts/script.js"></script>
 </body>
-
-
-
 </html>
