@@ -1,52 +1,81 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="utf-8" />
-    <title>Clamp Generator | By Ashfad</title>
-    <link rel="icon" href="assets/fav-icon.png" type="image/png">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <style>
-        body { background: #0f172a; color: #fff; }
-        .card { background: #111827; border: 1px solid #374151; }
-    </style>
+  <meta charset="utf-8" />
+  <title>Clamp Generator 2 | By Ashfad</title>
+  <link rel="icon" href="assets/fav-icon.png" type="image/png">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body { background: #0f172a; color: #fff; }
+    .card { background: #111827; border: 1px solid #374151; }
+  </style>
 </head>
 <body class="min-h-screen flex items-center justify-center p-6">
-    
-    <div id="sidebar-container"></div>
 
-   
-    <div class="w-full max-w-lg card p-6 rounded-lg shadow-lg">
-        <h1 class="text-2xl font-bold mb-4 text-center">CSS clamp() Generator</h1>
+        <div id="sidebar-container"></div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-                <label class="block text-sm mb-1">Min Value (px)</label>
-                <input id="minVal" type="number" step="any" value="16" class="w-full p-2 rounded bg-gray-800 text-white border border-gray-700" />
-            </div>
-            <div>
-                <label class="block text-sm mb-1">Max Value (px)</label>
-                <input id="maxVal" type="number" step="any" value="32" class="w-full p-2 rounded bg-gray-800 text-white border border-gray-700" />
-            </div>
-            <div>
-                <label class="block text-sm mb-1">Viewport Min (px)</label>
-                <input id="minVw" type="number" step="any" value="430" class="w-full p-2 rounded bg-gray-800 text-white border border-gray-700" />
-            </div>
-            <div>
-                <label class="block text-sm mb-1">Viewport Max (px)</label>
-                <input id="maxVw" type="number" step="any" value="1200" class="w-full p-2 rounded bg-gray-800 text-white border border-gray-700" />
-            </div>
-        </div>
+<div class="w-full max-w-lg card p-6 rounded-lg shadow-lg">
+  <h1 class="text-2xl font-bold mb-4 text-center">CSS clamp() Generator</h1>
 
-        <div class="mt-4">
-            <div id="outputBox" class="p-3 rounded bg-gray-800 text-green-300 font-mono text-sm cursor-pointer" title="Click to copy"></div>
-            <div id="cssSnippet" class="mt-2 text-xs text-gray-400"></div>
-        </div>
-
+  <!-- Inputs -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div>
+      <label class="block text-sm mb-1">Min Value (px)</label>
+      <input id="minVal" type="number" step="any" value="16" class="w-full p-2 rounded bg-gray-800 text-white border border-gray-700" />
     </div>
+    <div>
+      <label class="block text-sm mb-1">Max Value (px)</label>
+      <input id="maxVal" type="number" step="any" value="32" class="w-full p-2 rounded bg-gray-800 text-white border border-gray-700" />
+    </div>
+    <div>
+      <label class="block text-sm mb-1">Viewport Min (px)</label>
+      <input id="minVw" type="number" step="any" value="430" class="w-full p-2 rounded bg-gray-800 text-white border border-gray-700" />
+    </div>
+    <div>
+      <label class="block text-sm mb-1">Viewport Max (px)</label>
+      <input id="maxVw" type="number" step="any" value="1200" class="w-full p-2 rounded bg-gray-800 text-white border border-gray-700" />
+    </div>
+  </div>
+
+  <!-- Output -->
+  <div class="mt-4">
+    <div id="outputBox" class="p-3 rounded bg-gray-800 text-green-300 font-mono text-sm cursor-pointer" title="Click to copy"></div>
+    <div id="cssSnippet" class="mt-2 text-xs text-gray-400"></div>
+  </div>
+
+  <!-- Type + Create -->
+  <div class="mt-4 flex gap-2">
+    <select id="clampType" class="flex-1 p-2 rounded bg-gray-800 text-white border border-gray-700">
+      <option value="gap">gap</option>
+      <option value="typography">typography</option>
+      <option value="height">height</option>
+      <option value="width">width</option>
+      <option value="padding">padding</option>
+      <option value="margin">margin</option>
+    </select>
+    <button id="createVarBtn" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded text-white">Create Variable</button>
+  </div>
+
+  <!-- Generated Variables -->
+  <h2 class="mt-6 mb-2 font-semibold">Generated Variables</h2>
+  <div id="varList" class="space-y-2 max-h-48 overflow-y-auto"></div>
+
+  <!-- Download / Upload -->
+  <div class="mt-4 flex gap-2">
+    <button id="downloadBtn" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-white">Download JSON</button>
+    <label class="bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded text-white cursor-pointer">
+      Upload JSON
+      <input id="uploadInput" type="file" accept=".json" class="hidden" />
+    </label>
+  </div>
+</div>
+
 
 <script src="scripts/clamp.js"></script>
 <script src="scripts/script.js"></script>
-
 </body>
+
+
+
 </html>
